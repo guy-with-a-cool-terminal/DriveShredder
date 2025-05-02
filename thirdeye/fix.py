@@ -4,46 +4,40 @@ import shodan
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
-from core.scanner import shodan_search
-from core.filters import apply_filters
 
+# Load .env variables
 load_dotenv()
-SHODAN_API_KEY = os.getenv('SHODAN_API_KEY')
+SHODAN_API_KEY = os.getenv("SHODAN_API_KEY")
 
 console = Console()
 
-# check API key
+# Check API key
 if not SHODAN_API_KEY:
     console.print("[bold red]Error:[/bold red] SHODAN_API_KEY not found in .env")
     exit(1)
 
-# init shodan
+# Init Shodan
 api = shodan.Shodan(SHODAN_API_KEY)
+
 
 @click.command()
 @click.option('--region', default="Kenya", help='Region or country to search (default: Kenya)')
 @click.option('--query', default="port:554", help='Custom Shodan query (default: port:554)')
 @click.option('--limit', default=10, help='Number of results to return')
-@click.option('--mock', is_flag=True, help='Use mock data instead of live Shodan query')
-@click.option('--ignore-orgs', multiple=True, help='Ignore results from these organizations (e.g. Zuku, Safaricom)')
-@click.option('--only-products', multiple=True, help='Only include results with these product names (e.g. Hikvision, MikroTik)')
-@click.option('--only-ports', multiple=True, type=int, help='Only include results on these ports (e.g. 80, 554)')
-
-def scan(region, query, limit, mock,ignore_orgs, only_products, only_ports):
+def scan(region, query, limit):
     try:
-        results = shodan_search(query, region, limit, mock)
-        results = apply_filters(
-            results,
-            orgs_to_ignore=ignore_orgs,
-            products_to_include=only_products,
-            ports_to_include=only_ports
-        )
+        console.print(f"[bold green]Searching Shodan for:[/bold green] {query} in {region}")
+
+        # Build query with region
+        full_query = f"{query} country:{region}"
+        results = api.search(full_query, limit=limit)
 
         if not results['matches']:
             console.print("[yellow]No results found.[/yellow]")
             return
 
         table = Table(title="ThirdEye Results")
+
         table.add_column("IP", style="cyan")
         table.add_column("Port", style="magenta")
         table.add_column("Org", style="green")
@@ -58,9 +52,9 @@ def scan(region, query, limit, mock,ignore_orgs, only_products, only_ports):
 
         console.print(table)
 
-
     except shodan.APIError as e:
         console.print(f"[bold red]Shodan API error:[/bold red] {e}")
-    
+
+
 if __name__ == '__main__':
     scan()
